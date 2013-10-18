@@ -28,6 +28,14 @@ class PCallableExpectedError(PError):
     def __str__(self):
         return "%s: %s" % (self.msg, self.value.to_str())
 
+class PBoolExpectedError(PError):
+    def __init__(self, msg, value):
+        self.msg = msg
+        self.value = value
+
+    def __str__(self):
+        return "%s: %s" % (self.msg, self.value.to_str())
+
 class Resolver(object):
     def resolve(self, value):
         return value
@@ -202,6 +210,22 @@ true = Bool(True)
 false = Bool(False)
 nil = Nil()
 
+class ChoiceResolver(Resolver):
+    def __init__(self, valTrue, valFalse, env, cc):
+        self.valTrue = valTrue
+        self.valFalse = valFalse
+        self.cc = cc
+
+    def resolve(self, val):
+        if isinstance(val, Bool):
+            if val.value:
+                return self.valTrue.eval(self.cc)
+            else:
+                return self.valFalse.eval(self.cc)
+        else:
+            msg = "expected boolean result"
+            raise PBoolExpectedError("Bool expected", val)
+
 class Operative(Callable):
     def __init__(self, name):
         Callable.__init__(self, name)
@@ -255,17 +279,18 @@ def eval_seq_left(pair, cc, env):
         raise PBadMatchError(msg % pair.to_str())
 
 class Lambda(Applicative):
-    def __init__(self, argnames, body):
+    def __init__(self, senv, argnames, body):
         Applicative.__init__(self, "<lambda>")
         self.body = body
         self.argnames = argnames
+        self.senv = senv
 
     def handle(self, args, cc):
         if not isinstance(args, Pair):
             msg = "Expected sequence for function arguments, got %s"
             raise PBadMatchError(msg % args.to_str())
 
-        env = Env({}, cc.env)
+        env = Env({}, self.senv)
 
         # pypy doesn't like list(args)
         arglist = [item for item in args]

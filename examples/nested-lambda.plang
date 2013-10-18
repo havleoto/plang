@@ -1,0 +1,7 @@
+(def f
+  (lambda (x)
+   (lambda (y) (+ (* 10 x) y))))
+
+(display f)
+(display (f 1))
+(display ((f 1) 2))

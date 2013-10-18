@@ -15,6 +15,41 @@ class OpDo(Operative):
     def call(self, args, cc):
         return eval_seq_left(args, cc, cc.env)
 
+class OpIf(Operative):
+    def __init__(self):
+        Operative.__init__(self, "if")
+
+    def deconstruct(self, args):
+        # isinstance() on each subterm to appease RPython...
+        if isinstance(args, Pair):
+            a = args.head
+            t = args.tail
+            if isinstance(t, Pair):
+                b = t.head
+                s = t.tail
+                if isinstance(s, Pair):
+                    c = s.head
+                    u = s.tail
+                    if isinstance(u, Nil):
+                        return (a, b, c)
+                    else:
+                        self.invalid(args)
+                else:
+                    self.invalid(args)
+            else:
+                self.invalid(args)
+        else:
+            self.invalid(args)
+
+    def invalid(self, args):
+        msg = "expected ([$if] test consequent alternative), got %s"
+        raise PBadMatchError(msg % args.to_str())
+
+    def call(self, args, cc):
+        eTest, eTrue, eFalse = self.deconstruct(args)
+        cont = ChoiceResolver(eTrue, eFalse, cc.env, cc);
+        return eTest.eval(Cc(None, cont, cc.env, cc))
+
 class OpDef(Operative):
     def __init__(self):
         Operative.__init__(self, "def")
@@ -57,7 +92,7 @@ class OpLambda(Operative):
                 else:
                     params.append(param_name.value)
 
-            return cc.resolve(Lambda(params, args.tail))
+            return cc.resolve(Lambda(cc.env, params, args.tail))
         else:
             msg = "Expected lambda params to be ((*args) *body), got %s"
             raise PBadMatchError(msg % args.to_str())
@@ -268,10 +303,27 @@ class OpNe(CompNumOp):
     def calculate(self, last, current):
         return last != current
 
+class OpNot(Applicative):
+    def __init__(self):
+        Applicative.__init__(self, "not")
+
+    def handle(self, args, cc):
+        if isinstance(args, Pair):
+            arg = args.head
+            if isinstance(arg, Bool):
+                return cc.resolve(Bool(not arg.value))
+            else:
+                msg = "Expected boolean, got %s"
+                raise PBadMatchError(msg % args.to_str())
+        else:
+            msg = "Expected one argument, got %s"
+            raise PBadMatchError(msg % args.to_str())
+
 GROUND = {
     "dump": OpDump(),
     "do": OpDo(),
     "def": OpDef(),
+    "if": OpIf(),
     "lambda": OpLambda(),
     "call-cc": FnCallCc(),
     "display": FnDisplay(),
@@ -286,6 +338,21 @@ GROUND = {
     "<=": OpLe(),
     ">=": OpGe(),
     "==": OpEq(),
-    "!=": OpNe()
+    "!=": OpNe(),
+
+# subset of standard kernel ground bindings
+    "$sequence": OpDo(),
+    "$define!": OpDef(),
+    "$lambda": OpLambda(),
+    "$if": OpIf(),
+
+    "not?": OpNot(),
+
+    "<?": OpLt(),
+    ">?": OpGt(),
+    "<=?": OpLe(),
+    ">=?": OpGe(),
+    "=?": OpEq(),
+
 }
 

@@ -1,0 +1,11 @@
+(def factorial
+  (lambda (n)
+    (if (< n 1)
+      1
+      (* n (factorial (- n 1))))))
+
+(display (if true 2 3))
+(def x (if false 5 6))
+(display "x=" x)
+(display (factorial 5))
+(display (if true 2 3))
